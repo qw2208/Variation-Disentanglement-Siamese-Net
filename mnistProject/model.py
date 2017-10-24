@@ -2,7 +2,7 @@
 import sys
 sys.path.append("./")
 import tensorflow as tf
-import Decoder
+import numpy as np
 
 def batchnormalize(X, eps=1e-8, g=None, b=None):
     if X.get_shape().ndims == 4:
@@ -69,10 +69,12 @@ class VDSN():
         self.gen_W3 = tf.Variable(tf.random_normal([5,5,dim_W3,dim_W2], stddev=0.02), name='gen_W3')
         self.gen_W4 = tf.Variable(tf.random_normal([5,5,dim_channel,dim_W3], stddev=0.02), name='gen_W4')
 
-        self.discrim_W1 = tf.Variable(tf.random_normal([5,5,dim_channel+dim_y,dim_W3], stddev=0.02), name='discrim_W1')
-        self.discrim_W2 = tf.Variable(tf.random_normal([5,5,dim_W3+dim_y,dim_W2], stddev=0.02), name='discrim_W2')
-        self.discrim_W3 = tf.Variable(tf.random_normal([dim_W2*7*7+dim_y,dim_W1], stddev=0.02), name='discrim_W3')
-        self.discrim_W4 = tf.Variable(tf.random_normal([dim_W1+dim_y,1], stddev=0.02), name='discrim_W4')
+        self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02), name='discrim_W1')
+        self.discrim_W2 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_y], stddev=0.02), name='discrim_W2')
+        # self.discrim_W3 = tf.Variable(tf.random_normal([dim_W2*7*7+dim_y,dim_W1], stddev=0.02), name='discrim_W3')
+        # self.discrim_W4 = tf.Variable(tf.random_normal([dim_W1+dim_y,1], stddev=0.02), name='discrim_W4')
+        self.discrim_b1 = self.bias_variable([self.dim_F_V], name='dis_b1')
+        self.discrim_b2 = self.bias_variable([self.dim_y], name='dis_b2')
 
         self.encoder_W1 = tf.Variable(tf.random_normal([5, 5, dim_channel , dim_W3], stddev=0.02),name='encoder_W1')
         self.encoder_W2 = tf.Variable(tf.random_normal([5, 5, dim_W3 , dim_W2], stddev=0.02), name='encoder_W2')
@@ -100,7 +102,8 @@ class VDSN():
 
         image_gen = tf.nn.sigmoid(h4)
 
-        # raw_real = self.discriminate(image_real, Y)
+        Y_prediction = self.discriminate(F_V)
+
         # p_real = tf.nn.sigmoid(raw_real)
         # raw_gen = self.discriminate(image_gen, Y)
         # p_gen = tf.nn.sigmoid(raw_gen)
@@ -109,15 +112,23 @@ class VDSN():
         # discrim_cost = discrim_cost_real + discrim_cost_gen
 
         # gen_cost = bce( raw_gen, tf.ones_like(raw_gen))
-
+        # Y_indice = tf.concat(range(self.batch_size),tf.arg_max(Y,1))
+        # dis_max_prediction,_ = tf.gather_nd(params=tf.nn.softmax(Y_prediction),indices=Y_indice)
+        dis_max_prediction = [];
         gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
         encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())
+        discriminator_vars = filter(lambda x: x.name.startswith('discrim'), tf.trainable_variables())
         regularizer = tf.contrib.layers.l2_regularizer(0.1)
         gen_regularization_loss = tf.contrib.layers.apply_regularization(
             regularizer, weights_list= gen_vars + encoder_vars)
-        gen_cost = (tf.nn.l2_loss(image_real - image_gen))/self.batch_size
+        dis_regularization_loss = tf.contrib.layers.apply_regularization(
+            regularizer, weights_list=discriminator_vars)
+        gen_recon_cost = (tf.nn.l2_loss(image_real - image_gen))/self.batch_size
+        gen_disentangle_cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction))
+        dis_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction))
 
-        return Y, image_real, gen_cost, image_gen, gen_regularization_loss
+        return Y, image_real, gen_recon_cost, gen_disentangle_cost, \
+               dis_loss, image_gen, gen_regularization_loss, dis_regularization_loss, dis_max_prediction
 
     def encoder(self, image):
 
@@ -146,23 +157,12 @@ class VDSN():
 
         return h_fc1
 
-    def discriminate(self, image, Y):
-        yb = tf.reshape(Y, tf.stack([self.batch_size, 1, 1, self.dim_y]))
-        X = tf.concat(axis=3, values=[image, yb*tf.ones([self.batch_size, 28, 28, self.dim_y])])
-
-        h1 = lrelu( tf.nn.conv2d( X, self.discrim_W1, strides=[1,2,2,1], padding='SAME' ))
-        h1 = tf.concat(axis=3, values=[h1, yb*tf.ones([self.batch_size, 14, 14, self.dim_y])])
-
-        h2 = lrelu( batchnormalize( tf.nn.conv2d( h1, self.discrim_W2, strides=[1,2,2,1], padding='SAME')) )
-        h2 = tf.reshape(h2, [self.batch_size, -1])
-        h2 = tf.concat(axis=1, values=[h2, Y])
-
-        h3 = lrelu( batchnormalize( tf.matmul(h2, self.discrim_W3 ) ))
-        h3 = tf.concat(axis=1, values=[h3, Y])
-        
-        h4 = lrelu(batchnormalize(tf.matmul(h3,self.discrim_W4)))
-        
-        return h4
+    def discriminate(self, F_V):
+        # 512 to 512
+        h1 = lrelu( batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1))
+        # 512 to 10
+        h2 = lrelu( batchnormalize(tf.matmul(h1, self.discrim_W2) + self.discrim_b2))
+        return h2
 
     def generator(self, F_I,F_V):
 

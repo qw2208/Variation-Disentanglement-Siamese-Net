@@ -14,6 +14,8 @@ dim_W2 = 128
 dim_W3 = 64
 dim_channel = 1
 gen_regularizer_weight = 0.01
+dis_regularizer_weight = 0.01
+gen_disentangle_weight = 1
 visualize_dim=128
 
 # train image validation image, test image, train label, validation label, test label
@@ -29,21 +31,29 @@ dcgan_model = VDSN(
         )
 
 
-Y_tf, image_tf, g_cost_tf, image_gen, gen_reg_cost_tf = dcgan_model.build_model()
+Y_tf, image_tf, g_recon_cost_tf, gen_disentangle_cost_tf, dis_cost_tf,\
+    image_gen, gen_reg_cost_tf, dis_reg_cost_tf, dis_max_prediction_tf = dcgan_model.build_model()
 sess = tf.InteractiveSession()
 saver = tf.train.Saver(max_to_keep=10)
 
 discrim_vars = filter(lambda x: x.name.startswith('discrim'), tf.trainable_variables())
 gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
-encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())
+
+# include en_* and encoder_* W and b,
+encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
 # gen_regularizer_cost = gen_regularizer_weight * (tf.nn.l2_loss(gen_vars) + tf.nn.l2_loss(encoder_vars) )
 
 discrim_vars = [i for i in discrim_vars]
 gen_vars = [i for i in gen_vars]
 encoder_vars = [i for i in encoder_vars]
-gen_loss = g_cost_tf + gen_regularizer_weight * gen_reg_cost_tf
-# train_op_discrim = tf.train.AdamOptimizer(learning_rate, beta1=0.5).minimize(d_cost_tf, var_list=discrim_vars)
-train_op_gen = tf.train.AdamOptimizer(learning_rate, beta1=0.5).minimize(gen_loss, var_list=gen_vars + encoder_vars)
+gen_loss = g_recon_cost_tf + \
+   gen_disentangle_weight * gen_disentangle_cost_tf + gen_regularizer_weight * gen_reg_cost_tf
+dis_loss = dis_cost_tf + dis_regularizer_weight * dis_reg_cost_tf
+
+train_op_discrim = tf.train.AdamOptimizer(
+    learning_rate, beta1=0.5).minimize(dis_loss, var_list=discrim_vars)
+train_op_gen = tf.train.AdamOptimizer(
+    learning_rate, beta1=0.5).minimize(gen_loss, var_list=gen_vars + encoder_vars)
 
 # Z_tf_sample, Y_tf_sample, image_tf_sample = dcgan_model.samples_generator(batch_size=visualize_dim)
 
@@ -71,36 +81,34 @@ for epoch in range(n_epochs):
         Xs = trX[start:end].reshape( [-1, 28, 28, 1]) / 255.
         Ys = OneHot(trY[start:end],10)
 
-        # if np.mod( iterations, k ) != 0:
-        _, gen_loss_val, gen_reg_val = sess.run(
-                [train_op_gen, g_cost_tf, gen_reg_cost_tf],
-                feed_dict={
-                    Y_tf:Ys,
-                    image_tf:Xs
-                    })
-        # discrim_loss_val, p_real_val, p_gen_val = sess.run([d_cost_tf,p_real,p_gen], feed_dict={image_tf:Xs, Y_tf:Ys})
-        print("=========== updating G ==========")
-        print("iteration:", iterations)
-        print("gen loss:", gen_loss_val)
-        print("total gen loss:", gen_loss_val + gen_regularizer_weight * gen_reg_val)
-        # print("discrim loss:", discrim_loss_val)
+        if np.mod( iterations, k ) != 0:
+            _, gen_loss_val,gen_disentangle_val,  gen_reg_val, dis_max_prediction_val = sess.run(
+                    [train_op_gen, g_recon_cost_tf, gen_disentangle_cost_tf, gen_reg_cost_tf, dis_max_prediction_tf],
+                    feed_dict={
+                        Y_tf:Ys,
+                        image_tf:Xs
+                        })
+            print("=========== updating G ==========")
+            print("iteration:", iterations)
+            print("gen reconstruction loss:", gen_loss_val)
+            print("gen disentanglement loss :", gen_loss_val)
+            print("total gen loss:", gen_loss_val +
+                  gen_disentangle_weight * gen_loss_val + gen_regularizer_weight * gen_reg_val)
+            print("discrim correct prediction :", dis_max_prediction_val)
 
-        # else:
-        # _, discrim_loss_val = sess.run(
-        #         [train_op_discrim, d_cost_tf],
-        #         feed_dict={
-        #             Z_tf:Zs,
-        #             Y_tf:Ys,
-        #             image_tf:Xs
-        #             })
-        # gen_loss_val, p_real_val, p_gen_val = sess.run([g_cost_tf, p_real, p_gen], feed_dict={Z_tf:Zs, image_tf:Xs, Y_tf:Ys})
-        # print("=========== updating D ==========")
-        # print("iteration:", iterations)
-        # print("gen loss:", gen_loss_val)
-        # print("discrim loss:", discrim_loss_val)
+        else:
+            _, discrim_loss_val, discrim_reg_loss_val,  dis_max_prediction_val = sess.run(
+                    [train_op_discrim, dis_cost_tf, dis_reg_cost_tf, dis_max_prediction_tf],
+                    feed_dict={
+                        Y_tf:Ys,
+                        image_tf:Xs
+                        })
+            print("=========== updating D ==========")
+            print("iteration:", iterations)
+            print("discriminator loss:", discrim_loss_val)
+            print("discriminator total loss:", discrim_loss_val + dis_regularizer_weight * discrim_reg_loss_val)
+            print("discrim correct prediction :", dis_max_prediction_val)
 
-        # print("Average P(real)=", p_real_val.mean())
-        # print("Average P(gen)=", p_gen_val.mean())
 
         if np.mod(iterations, step) == 0:
             generated_samples = sess.run(

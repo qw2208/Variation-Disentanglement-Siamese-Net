@@ -71,15 +71,12 @@ class VDSN():
 
         self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02), name='discrim_W1')
         self.discrim_W2 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_y], stddev=0.02), name='discrim_W2')
-        # self.discrim_W3 = tf.Variable(tf.random_normal([dim_W2*7*7+dim_y,dim_W1], stddev=0.02), name='discrim_W3')
-        # self.discrim_W4 = tf.Variable(tf.random_normal([dim_W1+dim_y,1], stddev=0.02), name='discrim_W4')
         self.discrim_b1 = self.bias_variable([self.dim_F_V], name='dis_b1')
         self.discrim_b2 = self.bias_variable([self.dim_y], name='dis_b2')
 
         self.encoder_W1 = tf.Variable(tf.random_normal([5, 5, dim_channel , dim_W3], stddev=0.02),name='encoder_W1')
         self.encoder_W2 = tf.Variable(tf.random_normal([5, 5, dim_W3 , dim_W2], stddev=0.02), name='encoder_W2')
         self.encoder_W3 = tf.Variable(tf.random_normal([dim_W2 * 7 * 7 , dim_W1], stddev=0.02),name='encoder_W3')
-        # self.encoder_W4 = tf.Variable(tf.random_normal([dim_W1 + dim_y, 1], stddev=0.02), name='encoder_W4')
         self.encoder_b1 = self.bias_variable([dim_W3],name='en_b1')
         self.encoder_b2 = self.bias_variable([dim_W2],name='en_b2')
         self.encoder_b3 = self.bias_variable([dim_W1],name='en_b3')
@@ -114,7 +111,7 @@ class VDSN():
         # gen_cost = bce( raw_gen, tf.ones_like(raw_gen))
         # Y_indice = tf.concat(range(self.batch_size),tf.arg_max(Y,1))
         # dis_max_prediction,_ = tf.gather_nd(params=tf.nn.softmax(Y_prediction),indices=Y_indice)
-        dis_max_prediction = [];
+        dis_max_prediction = tf.reduce_max(Y*tf.nn.softmax(Y_prediction));
         gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
         encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())
         discriminator_vars = filter(lambda x: x.name.startswith('discrim'), tf.trainable_variables())

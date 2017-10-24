@@ -21,7 +21,7 @@ visualize_dim=128
 # train image validation image, test image, train label, validation label, test label
 trX, vaX, teX, trY, vaY, teY = mnist_with_valid_set()
 
-dcgan_model = VDSN(
+VDSN_model = VDSN(
         batch_size=batch_size,
         image_shape=image_shape,
         dim_z=dim_z,
@@ -32,11 +32,11 @@ dcgan_model = VDSN(
 
 
 Y_tf, image_tf, g_recon_cost_tf, gen_disentangle_cost_tf, dis_cost_tf,\
-    image_gen, gen_reg_cost_tf, dis_reg_cost_tf, dis_max_prediction_tf = dcgan_model.build_model()
+    image_gen, gen_reg_cost_tf, dis_reg_cost_tf, dis_max_prediction_tf = VDSN_model.build_model()
 sess = tf.InteractiveSession()
 saver = tf.train.Saver(max_to_keep=10)
 
-discrim_vars = filter(lambda x: x.name.startswith('discrim'), tf.trainable_variables())
+discrim_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
 gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
 
 # include en_* and encoder_* W and b,

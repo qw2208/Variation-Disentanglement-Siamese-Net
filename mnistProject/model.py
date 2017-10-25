@@ -89,43 +89,47 @@ class VDSN():
         '''
         # Z = tf.placeholder(tf.float32, [self.batch_size, self.dim_z])
         Y = tf.placeholder(tf.float32, [self.batch_size, self.dim_y])
-        image_real = tf.placeholder(tf.float32, [self.batch_size]+self.image_shape)
-        h_fc1 = self.encoder(image_real)
+
+        image_real_left = tf.placeholder(tf.float32, [self.batch_size]+self.image_shape)
+        image_real_right = tf.placeholder(tf.float32, [self.batch_size]+self.image_shape)
+        h_fc1_left = self.encoder(image_real_left)
+        h_fc1_right = self.encoder(image_real_right)
 
         #  F_V for variance representation
         #  F_I for identity representation
-        F_I,F_V = tf.split(h_fc1, num_or_size_splits=2, axis = 1)
-        h4 = self.generator(F_I,F_V)
+        F_I_left, F_V_left = tf.split(h_fc1_left, num_or_size_splits=2, axis = 1)
+        F_I_right, F_V_right = tf.split(h_fc1_right, num_or_size_splits=2, axis = 1)
+        h4_right = self.generator(F_I_left, F_V_right)
+        h4_left = self.generator(F_I_right, F_V_left)
 
-        image_gen = tf.nn.sigmoid(h4)
+        image_gen_left = tf.nn.sigmoid(h4_left)
+        image_gen_right = tf.nn.sigmoid(h4_right)
 
-        Y_prediction = self.discriminate(F_V)
+        Y_prediction_left = self.discriminate(F_V_left)
+        Y_prediction_right = self.discriminate(F_V_right)
 
-        # p_real = tf.nn.sigmoid(raw_real)
-        # raw_gen = self.discriminate(image_gen, Y)
-        # p_gen = tf.nn.sigmoid(raw_gen)
-        # discrim_cost_real = bce(raw_real, tf.ones_like(raw_real))
-        # discrim_cost_gen = bce(raw_gen, tf.zeros_like(raw_gen))
-        # discrim_cost = discrim_cost_real + discrim_cost_gen
+        dis_max_prediction_left = tf.reduce_max(Y*tf.nn.softmax(Y_prediction_left))
+        dis_max_prediction_right = tf.reduce_max(Y*tf.nn.softmax(Y_prediction_right))
 
-        # gen_cost = bce( raw_gen, tf.ones_like(raw_gen))
-        # Y_indice = tf.concat(range(self.batch_size),tf.arg_max(Y,1))
-        # dis_max_prediction,_ = tf.gather_nd(params=tf.nn.softmax(Y_prediction),indices=Y_indice)
-        dis_max_prediction = tf.reduce_max(Y*tf.nn.softmax(Y_prediction));
         gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
         encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())
         discriminator_vars = filter(lambda x: x.name.startswith('discrim'), tf.trainable_variables())
+
         regularizer = tf.contrib.layers.l2_regularizer(0.1)
         gen_regularization_loss = tf.contrib.layers.apply_regularization(
             regularizer, weights_list= gen_vars + encoder_vars)
         dis_regularization_loss = tf.contrib.layers.apply_regularization(
             regularizer, weights_list=discriminator_vars)
-        gen_recon_cost = (tf.nn.l2_loss(image_real - image_gen))/self.batch_size
-        gen_disentangle_cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction))
-        dis_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction))
-
-        return Y, image_real, gen_recon_cost, gen_disentangle_cost, \
-               dis_loss, image_gen, gen_regularization_loss, dis_regularization_loss, dis_max_prediction
+        
+        gen_recon_cost_left = (tf.nn.l2_loss(image_real_left - image_gen_left))/self.batch_size
+        gen_recon_cost_right = (tf.nn.l2_loss(image_real_right - image_gen_right))/self.batch_size
+        gen_disentangle_cost_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction_left))
+        gen_disentangle_cost_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction_right))
+        dis_loss_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction_left))
+        dis_loss_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction_right))
+        return Y, image_real_left, image_real_right, gen_recon_cost_left, gen_recon_cost_right, gen_disentangle_cost_left, \
+               gen_disentangle_cost_right, dis_loss_left, dis_loss_right, image_gen_left, image_gen_right, gen_regularization_loss, \
+               dis_regularization_loss, dis_max_prediction_left, dis_max_prediction_right
 
     def encoder(self, image):
 

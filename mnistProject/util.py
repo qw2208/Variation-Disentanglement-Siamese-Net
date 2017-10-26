@@ -1,6 +1,7 @@
 import cv2
 import scipy.misc
 import numpy as np
+import os
 
 def OneHot(X, n=None, negative_class=0.):
     X = np.asarray(X).flatten()
@@ -33,6 +34,9 @@ def save_visualization(X_origin, X, nh_nw, save_path='./vis/sample.jpg'):
     img = np.zeros((h * nh_nw[0], w * 2 * nh_nw[1], 3))
 
     for n,x in enumerate(X):
+        # if iterate to more than the required amount of images, end drawing
+        if n >= nh_nw[0] * nh_nw[1] * 2:
+            break;
         x_origin=X_origin[n]
         j = n // nh_nw[1]
         i = n % nh_nw[1]
@@ -40,3 +44,23 @@ def save_visualization(X_origin, X, nh_nw, save_path='./vis/sample.jpg'):
         img[j*h:j*h+h, (2*i+1)*w:(2*i+1)*w+w, :] = x
 
     scipy.misc.imsave(save_path, img)
+
+def check_create_dir(dir):
+    try:
+        os.stat(dir)
+    except:
+        os.mkdir(dir)
+    return dir
+
+
+def randomPickRight(start, end, trX, trY, indexTable):
+    randomList = []
+    for i in range(start, end):
+        while True:
+            randomPick = np.random.choice(indexTable[trY[i]], 1)[0]
+            if randomPick == i:
+                continue
+            else:
+                randomList.append(randomPick)
+            break
+    return trX[randomList]

@@ -44,7 +44,6 @@ class VDSN():
             self,
             batch_size=100,
             image_shape=[28,28,1],
-            dim_z=100,
             dim_y=10,
             dim_W1=1024,
             dim_W2=128,
@@ -55,7 +54,6 @@ class VDSN():
 
         self.batch_size = batch_size
         self.image_shape = image_shape
-        self.dim_z = dim_z
         self.dim_y = dim_y
         self.dim_F_I = 512
         self.dim_F_V = dim_W1 - dim_F_I
@@ -82,7 +80,7 @@ class VDSN():
         self.encoder_b3 = self.bias_variable([dim_W1],name='en_b3')
 
 
-    def build_model(self):
+    def build_model(self, gen_disentangle_weight=1, gen_regularizer_weight=1, dis_regularizer_weight=1):
 
         '''
          Y for class label
@@ -129,9 +127,22 @@ class VDSN():
         gen_disentangle_cost_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction_right))
         dis_loss_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction_left))
         dis_loss_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction_right))
-        return Y, image_real_left, image_real_right, gen_recon_cost_left, gen_recon_cost_right, gen_disentangle_cost_left, \
-               gen_disentangle_cost_right, dis_loss_left, dis_loss_right, image_gen_left, image_gen_right, gen_regularization_loss, \
-               dis_regularization_loss, dis_max_prediction_left, dis_max_prediction_right
+
+        gen_recon_cost = (gen_recon_cost_left + gen_recon_cost_right) / 2
+        gen_disentangle_cost = (gen_disentangle_cost_left + gen_disentangle_cost_right) / 2
+        gen_total_cost = gen_recon_cost + gen_disentangle_weight * gen_disentangle_cost + gen_regularizer_weight * gen_regularization_loss
+        dis_cost_tf = (dis_loss_left + dis_loss_right) / 2
+        dis_total_cost_tf = dis_cost_tf + dis_regularizer_weight * dis_regularization_loss
+
+        tf.summary.scalar('gen_recon_cost', gen_recon_cost)
+        tf.summary.scalar('gen_disentangle_cost', gen_disentangle_cost)
+        tf.summary.scalar('gen_total_cost', gen_total_cost)
+        tf.summary.scalar('dis_cost_tf', dis_cost_tf)
+        tf.summary.scalar('dis_total_cost_tf', dis_total_cost_tf)
+
+        return Y, image_real_left, image_real_right, gen_recon_cost, gen_disentangle_cost, gen_total_cost, \
+               dis_cost_tf, dis_total_cost_tf, image_gen_left, image_gen_right, \
+               dis_max_prediction_left, dis_max_prediction_right
 
     def encoder(self, image):
 

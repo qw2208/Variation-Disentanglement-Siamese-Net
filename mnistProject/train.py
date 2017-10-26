@@ -16,6 +16,9 @@ parser.add_argument("--batch_size", nargs='?', type=int, default=128,
 parser.add_argument("--n_epochs", nargs='?', type=int, default=100,
                     help="number of epochs")
 
+parser.add_argument("--drawing_step", nargs='?', type=int, default=200,
+                    help="how many steps to draw a comparision pic")
+
 parser.add_argument("--gen_regularizer_weight", nargs='?', type=float, default=0.01,
                     help="generator regularization weight")
 
@@ -67,6 +70,7 @@ test_logs_dir = check_create_dir(args.test_logs_dir_parent + time_dir + '/')
 model_dir = check_create_dir(args.model_dir_parent + time_dir + '/')
 
 visualize_dim=batch_size
+drawing_step = args.drawing_step
 
 # train image validation image, test image, train label, validation label, test label
 trX, vaX, teX, trY, vaY, teY = mnist_with_valid_set()
@@ -107,7 +111,6 @@ train_op_gen = tf.train.AdamOptimizer(
 
 iterations = 0
 k = 2
-drawing_step = 200
 
 with tf.Session(config=tf.ConfigProto()) as sess:
     sess.run(tf.global_variables_initializer())

@@ -37,7 +37,11 @@ parser.add_argument("--test_logs_dir_parent", nargs='?', type=str, default='tens
 parser.add_argument("--model_dir_parent", nargs='?', type=str, default='model_treasury/',
                     help="root dir to save model")
 
+parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
+                    help="which gpu to use")
+
 args = parser.parse_args()
+os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 
 n_epochs = args.n_epochs
 learning_rate = args.learning_rate

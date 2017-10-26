@@ -44,7 +44,6 @@ class VDSN():
             self,
             batch_size=100,
             image_shape=[28,28,1],
-            dim_z=100,
             dim_y=10,
             dim_W1=1024,
             dim_W2=128,
@@ -55,7 +54,6 @@ class VDSN():
 
         self.batch_size = batch_size
         self.image_shape = image_shape
-        self.dim_z = dim_z
         self.dim_y = dim_y
         self.dim_F_I = 512
         self.dim_F_V = dim_W1 - dim_F_I
@@ -82,16 +80,15 @@ class VDSN():
         self.encoder_b3 = self.bias_variable([dim_W1],name='en_b3')
 
 
-    def build_model(self):
+    def build_model(self, gen_disentangle_weight=1, gen_regularizer_weight=1, dis_regularizer_weight=1):
 
         '''
          Y for class label
         '''
-        # Z = tf.placeholder(tf.float32, [self.batch_size, self.dim_z])
-        Y = tf.placeholder(tf.float32, [self.batch_size, self.dim_y])
+        Y = tf.placeholder(tf.float32, [None, self.dim_y])
 
-        image_real_left = tf.placeholder(tf.float32, [self.batch_size]+self.image_shape)
-        image_real_right = tf.placeholder(tf.float32, [self.batch_size]+self.image_shape)
+        image_real_left = tf.placeholder(tf.float32, [None] + self.image_shape)
+        image_real_right = tf.placeholder(tf.float32, [None] + self.image_shape)
         h_fc1_left = self.encoder(image_real_left)
         h_fc1_right = self.encoder(image_real_right)
 
@@ -108,8 +105,11 @@ class VDSN():
         Y_prediction_left = self.discriminate(F_V_left)
         Y_prediction_right = self.discriminate(F_V_right)
 
-        dis_max_prediction_left = tf.reduce_max(Y*tf.nn.softmax(Y_prediction_left))
-        dis_max_prediction_right = tf.reduce_max(Y*tf.nn.softmax(Y_prediction_right))
+        Y_result_left = tf.reduce_sum(Y * tf.nn.softmax(Y_prediction_left), axis=1)
+        Y_result_right = tf.reduce_sum(Y * tf.nn.softmax(Y_prediction_right), axis=1)
+
+        dis_max_prediction_left = [tf.reduce_max(Y_result_left), tf.reduce_mean(Y_result_left), tf.reduce_min(Y_result_left)];
+        dis_max_prediction_right = [tf.reduce_max(Y_result_right), tf.reduce_mean(Y_result_right), tf.reduce_min(Y_result_right)];
 
         gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
         encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())
@@ -121,15 +121,28 @@ class VDSN():
         dis_regularization_loss = tf.contrib.layers.apply_regularization(
             regularizer, weights_list=discriminator_vars)
         
-        gen_recon_cost_left = (tf.nn.l2_loss(image_real_left - image_gen_left))/self.batch_size
-        gen_recon_cost_right = (tf.nn.l2_loss(image_real_right - image_gen_right))/self.batch_size
+        gen_recon_cost_left = tf.nn.l2_loss(image_real_left - image_gen_left) / self.batch_size
+        gen_recon_cost_right = tf.nn.l2_loss(image_real_left - image_gen_left) / self.batch_size
         gen_disentangle_cost_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction_left))
         gen_disentangle_cost_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction_right))
         dis_loss_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction_left))
         dis_loss_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction_right))
-        return Y, image_real_left, image_real_right, gen_recon_cost_left, gen_recon_cost_right, gen_disentangle_cost_left, \
-               gen_disentangle_cost_right, dis_loss_left, dis_loss_right, image_gen_left, image_gen_right, gen_regularization_loss, \
-               dis_regularization_loss, dis_max_prediction_left, dis_max_prediction_right
+
+        gen_recon_cost = (gen_recon_cost_left + gen_recon_cost_right) / 2
+        gen_disentangle_cost = (gen_disentangle_cost_left + gen_disentangle_cost_right) / 2
+        gen_total_cost = gen_recon_cost + gen_disentangle_weight * gen_disentangle_cost + gen_regularizer_weight * gen_regularization_loss
+        dis_cost_tf = (dis_loss_left + dis_loss_right) / 2
+        dis_total_cost_tf = dis_cost_tf + dis_regularizer_weight * dis_regularization_loss
+
+        tf.summary.scalar('gen_recon_cost', gen_recon_cost)
+        tf.summary.scalar('gen_disentangle_cost', gen_disentangle_cost)
+        tf.summary.scalar('gen_total_cost', gen_total_cost)
+        tf.summary.scalar('dis_cost_tf', dis_cost_tf)
+        tf.summary.scalar('dis_total_cost_tf', dis_total_cost_tf)
+
+        return Y, image_real_left, image_real_right, gen_recon_cost, gen_disentangle_cost, gen_total_cost, \
+               dis_cost_tf, dis_total_cost_tf, image_gen_left, image_gen_right, \
+               dis_max_prediction_left, dis_max_prediction_right
 
     def encoder(self, image):
 
@@ -170,7 +183,7 @@ class VDSN():
         F_combine = tf.concat(axis=1, values=[F_I,F_V])
         h1 = tf.nn.relu(batchnormalize(tf.matmul(F_combine, self.gen_W1)))
         h2 = tf.nn.relu(batchnormalize(tf.matmul(h1, self.gen_W2)))
-        h2 = tf.reshape(h2, [self.batch_size,7,7,self.dim_W2])
+        h2 = tf.reshape(h2, [-1,7,7,self.dim_W2])
 
         output_shape_l3 = [self.batch_size,14,14,self.dim_W3]
         h3 = tf.nn.conv2d_transpose(h2, self.gen_W3, output_shape=output_shape_l3, strides=[1,2,2,1])

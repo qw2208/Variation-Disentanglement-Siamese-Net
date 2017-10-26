@@ -15,7 +15,7 @@ dim_W3 = 64
 dim_channel = 1
 gen_regularizer_weight = 0.01
 dis_regularizer_weight = 0.01
-gen_disentangle_weight = 1
+gen_disentangle_weight = 10
 visualize_dim=128
 
 # train image validation image, test image, train label, validation label, test label
@@ -80,7 +80,6 @@ def randomPickRight(start, end, trX, trY, indexTable):
 	    else:
 		randomList.append(randomPick)
 		break
-    print randomList
     return trX[randomList]
 
 
@@ -107,7 +106,7 @@ for epoch in range(n_epochs):
 
         if np.mod( iterations, k ) != 0:
             _, gen_loss_val_left, gen_loss_val_right, gen_disentangle_val_left, gen_disentangle_val_right, gen_reg_val, \
-                    dis_max_prediction_tf_left, dis_max_prediction_tf_right = sess.run(
+                    dis_max_prediction_val_left, dis_max_prediction_val_right = sess.run(
                     [train_op_gen, g_recon_cost_tf_left, g_recon_cost_tf_right, gen_disentangle_cost_tf_left, \
                     gen_disentangle_cost_tf_right, gen_reg_cost_tf, dis_max_prediction_tf_left, dis_max_prediction_tf_right],
                     feed_dict={
@@ -116,7 +115,7 @@ for epoch in range(n_epochs):
                         image_tf_real_right: Xs_right 
                         })
             gen_loss_val = float(gen_loss_val_left + gen_loss_val_right) / 2
-            dis_max_prediction_val = float(dis_max_prediction_tf_left + dis_max_prediction_tf_right) / 2
+            dis_max_prediction_val = float(dis_max_prediction_val_left + dis_max_prediction_val_right) / 2
             print("=========== updating G ==========")
             print("iteration:", iterations)
             print("gen reconstruction loss:", gen_loss_val)

@@ -73,14 +73,13 @@ step = 20
 def randomPickRight(start, end, trX, trY, indexTable):
     randomList = []
     for i in range(start, end):
-	while True:
+        while True:
             randomPick = np.random.choice(indexTable[trY[i]], 1)[0]
-	    if randomPick == i:
-		continue
-	    else:
-		randomList.append(randomPick)
-		break
-    print randomList
+            if randomPick == i:
+                continue
+            else:
+                randomList.append(randomPick)
+            break
     return trX[randomList]
 
 
@@ -107,7 +106,7 @@ for epoch in range(n_epochs):
 
         if np.mod( iterations, k ) != 0:
             _, gen_loss_val_left, gen_loss_val_right, gen_disentangle_val_left, gen_disentangle_val_right, gen_reg_val, \
-                    dis_max_prediction_tf_left, dis_max_prediction_tf_right = sess.run(
+                    dis_max_prediction_val_left, dis_max_prediction_val_right = sess.run(
                     [train_op_gen, g_recon_cost_tf_left, g_recon_cost_tf_right, gen_disentangle_cost_tf_left, \
                     gen_disentangle_cost_tf_right, gen_reg_cost_tf, dis_max_prediction_tf_left, dis_max_prediction_tf_right],
                     feed_dict={
@@ -116,14 +115,14 @@ for epoch in range(n_epochs):
                         image_tf_real_right: Xs_right 
                         })
             gen_loss_val = float(gen_loss_val_left + gen_loss_val_right) / 2
-            dis_max_prediction_val = float(dis_max_prediction_tf_left + dis_max_prediction_tf_right) / 2
             print("=========== updating G ==========")
             print("iteration:", iterations)
             print("gen reconstruction loss:", gen_loss_val)
             print("gen disentanglement loss :", gen_loss_val)
             print("total gen loss:", gen_loss_val +
                   gen_disentangle_weight * gen_loss_val + gen_regularizer_weight * gen_reg_val)
-            print("discrim correct prediction :", dis_max_prediction_val)
+            print("discrim left correct prediction :", dis_max_prediction_val_left)
+            print("discrim right correct prediction :", dis_max_prediction_val_right)
 
         else:
             _, discrim_loss_val_left, discrim_loss_val_right, discrim_reg_loss_val,\
@@ -137,12 +136,12 @@ for epoch in range(n_epochs):
                         })
 
             discrim_loss_val = float(discrim_loss_val_right + discrim_loss_val_left) / 2
-            dis_max_prediction_val = float(dis_max_prediction_val_left + dis_max_prediction_val_right) / 2
             print("=========== updating D ==========")
             print("iteration:", iterations)
             print("discriminator loss:", discrim_loss_val)
             print("discriminator total loss:", discrim_loss_val + dis_regularizer_weight * discrim_reg_loss_val)
-            print("discrim correct prediction :", dis_max_prediction_val)
+            print("discrim left correct prediction :", dis_max_prediction_val_left)
+            print("discrim right correct prediction :", dis_max_prediction_val_right)
 
 
         if np.mod(iterations, step) == 0:

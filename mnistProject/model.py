@@ -108,8 +108,11 @@ class VDSN():
         Y_prediction_left = self.discriminate(F_V_left)
         Y_prediction_right = self.discriminate(F_V_right)
 
-        dis_max_prediction_left = tf.reduce_max(Y*tf.nn.softmax(Y_prediction_left))
-        dis_max_prediction_right = tf.reduce_max(Y*tf.nn.softmax(Y_prediction_right))
+        Y_result_left = tf.reduce_sum(Y * tf.nn.softmax(Y_prediction_left), axis=1)
+        Y_result_right = tf.reduce_sum(Y * tf.nn.softmax(Y_prediction_right), axis=1)
+
+        dis_max_prediction_left = [tf.reduce_max(Y_result_left), tf.reduce_mean(Y_result_left), tf.reduce_min(Y_result_left)];
+        dis_max_prediction_right = [tf.reduce_max(Y_result_right), tf.reduce_mean(Y_result_right), tf.reduce_min(Y_result_right)];
 
         gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
         encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())

@@ -108,9 +108,9 @@ gen_vars = [i for i in gen_vars]
 encoder_vars = [i for i in encoder_vars]
 
 train_op_discrim = tf.train.AdamOptimizer(
-    learning_rate, beta1=0.5).minimize(gen_total_cost_tf, var_list=discrim_vars, global_step=global_step)
+    learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=discrim_vars, global_step=global_step)
 train_op_gen = tf.train.AdamOptimizer(
-    learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=gen_vars + encoder_vars, global_step=global_step)
+    learning_rate, beta1=0.5).minimize(gen_total_cost_tf, var_list=gen_vars + encoder_vars, global_step=global_step)
 
 
 iterations = 0

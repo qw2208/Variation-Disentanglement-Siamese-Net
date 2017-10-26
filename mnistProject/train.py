@@ -3,8 +3,9 @@ import numpy as np
 from model import *
 from util import *
 from load import mnist_with_valid_set
-from time import gmtime, strftime
+from time import localtime, strftime
 import argparse
+import result_validation
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--learning_rate", nargs='?', type=float, default=0.0002,
@@ -46,6 +47,10 @@ parser.add_argument("--pic_dir_parent", nargs='?', type=str, default='vis/',
 parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                     help="which gpu to use")
 
+parser.add_argument("--validate_disentanglement", action="store_true",
+                    help="run F_V disentanglement classification task")
+
+
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 
@@ -58,7 +63,7 @@ dim_y=10
 dim_W1 = 1024
 dim_W2 = 128
 dim_W3 = 64
-time_dir = strftime("%Y-%m-%d-%H-%M-%S", gmtime())
+time_dir = strftime("%Y-%m-%d-%H-%M-%S", localtime())
 gen_disentangle_weight = args.gen_disentangle_weight
 gen_regularizer_weight = args.gen_regularizer_weight
 dis_regularizer_weight = args.dis_regularizer_weight
@@ -112,9 +117,9 @@ train_op_discrim = tf.train.AdamOptimizer(
 train_op_gen = tf.train.AdamOptimizer(
     learning_rate, beta1=0.5).minimize(gen_total_cost_tf, var_list=gen_vars + encoder_vars, global_step=global_step)
 
-
 iterations = 0
 k = 2
+save_path=""
 
 with tf.Session(config=tf.ConfigProto()) as sess:
     sess.run(tf.global_variables_initializer())
@@ -205,3 +210,16 @@ with tf.Session(config=tf.ConfigProto()) as sess:
     save_path = saver.save(sess, "{}{}_{}_{}_{}.ckpt".format(model_dir,
         gen_regularizer_weight, dis_regularizer_weight, gen_disentangle_weight, time_dir))
     print("Model saved in file: %s" % save_path)
+
+F_V_classification_conf = {
+    "save_path": save_path,
+    "trX": trX,
+    "trY": trY,
+    "vaX": vaX,
+    "vaY": vaY,
+    "teX": teX,
+    "teY": teY
+}
+
+if args.validate_disentanglement:
+    result_validation.validate_F_V_classification_fail(F_V_classification_conf)

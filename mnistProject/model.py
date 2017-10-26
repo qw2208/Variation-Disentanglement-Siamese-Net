@@ -121,8 +121,8 @@ class VDSN():
         dis_regularization_loss = tf.contrib.layers.apply_regularization(
             regularizer, weights_list=discriminator_vars)
         
-        gen_recon_cost_left = tf.reduce_mean((image_real_left - image_gen_left)*(image_real_left - image_gen_left))
-        gen_recon_cost_right = tf.reduce_mean((image_real_right - image_gen_right)*(image_real_right - image_gen_right))
+        gen_recon_cost_left = tf.nn.l2_loss(image_real_left - image_gen_left) / self.batch_size
+        gen_recon_cost_right = tf.nn.l2_loss(image_real_left - image_gen_left) / self.batch_size
         gen_disentangle_cost_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction_left))
         gen_disentangle_cost_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction_right))
         dis_loss_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction_left))

@@ -40,6 +40,9 @@ parser.add_argument("--test_logs_dir_parent", nargs='?', type=str, default='tens
 parser.add_argument("--model_dir_parent", nargs='?', type=str, default='model_treasury/',
                     help="root dir to save model")
 
+parser.add_argument("--pic_dir_parent", nargs='?', type=str, default='vis/',
+                    help="root dir to save pic")
+
 parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                     help="which gpu to use")
 
@@ -64,6 +67,7 @@ check_create_dir(args.logs_dir_root)
 check_create_dir(args.training_logs_dir_parent)
 check_create_dir(args.test_logs_dir_parent)
 check_create_dir(args.model_dir_parent)
+check_create_dir(args.pic_dir_parent)
 
 training_logs_dir = check_create_dir(args.training_logs_dir_parent + time_dir + '/')
 test_logs_dir = check_create_dir(args.test_logs_dir_parent + time_dir + '/')
@@ -193,7 +197,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                             image_tf_real_right: corrRightVal.reshape([-1, 28, 28, 1]) / 255
                             })
                 # since 16 * 8  = batch size * 2
-                save_visualization(image_real_left, generated_samples_left, (16,8), save_path='./vis/sample_%04d.jpg' % int(iterations/drawing_step))
+                save_visualization(image_real_left, generated_samples_left, (16,8), save_path=args.pic_dir_parent+'sample_%04d.jpg' % int(iterations))
 
             iterations += 1
 

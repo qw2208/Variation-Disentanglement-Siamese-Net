@@ -15,7 +15,7 @@ dim_W3 = 64
 dim_channel = 1
 gen_regularizer_weight = 0.01
 dis_regularizer_weight = 0.01
-gen_disentangle_weight = 1
+gen_disentangle_weight = 10
 visualize_dim=128
 
 # train image validation image, test image, train label, validation label, test label
@@ -47,6 +47,7 @@ encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables(
 discrim_vars = [i for i in discrim_vars]
 gen_vars = [i for i in gen_vars]
 encoder_vars = [i for i in encoder_vars]
+
 gen_loss_left = g_recon_cost_tf_left + gen_disentangle_weight * gen_disentangle_cost_tf_left
 gen_loss_right = g_recon_cost_tf_right + gen_disentangle_weight * gen_disentangle_cost_tf_right 
 gen_loss = gen_loss_left + gen_loss_right + gen_regularizer_weight * gen_reg_cost_tf
@@ -68,7 +69,7 @@ tf.global_variables_initializer().run()
 iterations = 0
 k = 2
 
-step = 20
+step = 200
 
 def randomPickRight(start, end, trX, trY, indexTable):
     randomList = []
@@ -115,12 +116,13 @@ for epoch in range(n_epochs):
                         image_tf_real_right: Xs_right 
                         })
             gen_loss_val = float(gen_loss_val_left + gen_loss_val_right) / 2
+            gen_disentangle_val = float(gen_disentangle_val_left + gen_disentangle_val_right) / 2
             print("=========== updating G ==========")
             print("iteration:", iterations)
             print("gen reconstruction loss:", gen_loss_val)
-            print("gen disentanglement loss :", gen_loss_val)
-            print("total gen loss:", gen_loss_val +
-                  gen_disentangle_weight * gen_loss_val + gen_regularizer_weight * gen_reg_val)
+            print("gen disentanglement loss :", gen_disentangle_val)
+            print("total weigthted gen loss :", gen_loss_val +
+                  gen_disentangle_weight * gen_disentangle_val + gen_regularizer_weight * gen_reg_val)
             print("discrim left correct prediction :", dis_max_prediction_val_left)
             print("discrim right correct prediction :", dis_max_prediction_val_right)
 
@@ -139,7 +141,7 @@ for epoch in range(n_epochs):
             print("=========== updating D ==========")
             print("iteration:", iterations)
             print("discriminator loss:", discrim_loss_val)
-            print("discriminator total loss:", discrim_loss_val + dis_regularizer_weight * discrim_reg_loss_val)
+            print("discriminator total weigthted loss:", discrim_loss_val + dis_regularizer_weight * discrim_reg_loss_val)
             print("discrim left correct prediction :", dis_max_prediction_val_left)
             print("discrim right correct prediction :", dis_max_prediction_val_right)
 
@@ -149,14 +151,15 @@ for epoch in range(n_epochs):
             for index in range(len(vaY)):
                 indexTableVal[vaY[index]].append(index)
             corrRightVal = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
+            image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
             generated_samples_left = sess.run(
                     image_gen_left,
                     feed_dict={
-                        image_tf_real_left: vaX[0:visualize_dim].reshape( [-1, 28, 28, 1]) / 255, 
-                        image_tf_real_right: corrRightVal.reshape( [-1, 28, 28, 1]) / 255
+                        image_tf_real_left: image_real_left,
+                        image_tf_real_right: corrRightVal.reshape([-1, 28, 28, 1]) / 255
                         })
-            # generated_samples = (generated_samples + 1.)/2.
-            save_visualization(generated_samples_left, (14,14), save_path='./vis/sample_%04d.jpg' % int(iterations/step))
+            # since 16 * 8  = batch size * 2
+            save_visualization(image_real_left, generated_samples_left, (16,8), save_path='./vis/sample_%04d.jpg' % int(iterations/step))
 
         iterations += 1
 

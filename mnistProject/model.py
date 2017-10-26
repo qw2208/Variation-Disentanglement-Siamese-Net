@@ -87,11 +87,10 @@ class VDSN():
         '''
          Y for class label
         '''
-        # Z = tf.placeholder(tf.float32, [self.batch_size, self.dim_z])
-        Y = tf.placeholder(tf.float32, [self.batch_size, self.dim_y])
+        Y = tf.placeholder(tf.float32, [None, self.dim_y])
 
-        image_real_left = tf.placeholder(tf.float32, [self.batch_size]+self.image_shape)
-        image_real_right = tf.placeholder(tf.float32, [self.batch_size]+self.image_shape)
+        image_real_left = tf.placeholder(tf.float32, [None] + self.image_shape)
+        image_real_right = tf.placeholder(tf.float32, [None] + self.image_shape)
         h_fc1_left = self.encoder(image_real_left)
         h_fc1_right = self.encoder(image_real_right)
 
@@ -124,8 +123,8 @@ class VDSN():
         dis_regularization_loss = tf.contrib.layers.apply_regularization(
             regularizer, weights_list=discriminator_vars)
         
-        gen_recon_cost_left = (tf.nn.l2_loss(image_real_left - image_gen_left))/self.batch_size
-        gen_recon_cost_right = (tf.nn.l2_loss(image_real_right - image_gen_right))/self.batch_size
+        gen_recon_cost_left = tf.reduce_mean((image_real_left - image_gen_left)*(image_real_left - image_gen_left))
+        gen_recon_cost_right = tf.reduce_mean((image_real_right - image_gen_right)*(image_real_right - image_gen_right))
         gen_disentangle_cost_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction_left))
         gen_disentangle_cost_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=1-Y, logits=Y_prediction_right))
         dis_loss_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_prediction_left))
@@ -173,7 +172,7 @@ class VDSN():
         F_combine = tf.concat(axis=1, values=[F_I,F_V])
         h1 = tf.nn.relu(batchnormalize(tf.matmul(F_combine, self.gen_W1)))
         h2 = tf.nn.relu(batchnormalize(tf.matmul(h1, self.gen_W2)))
-        h2 = tf.reshape(h2, [self.batch_size,7,7,self.dim_W2])
+        h2 = tf.reshape(h2, [-1,7,7,self.dim_W2])
 
         output_shape_l3 = [self.batch_size,14,14,self.dim_W3]
         h3 = tf.nn.conv2d_transpose(h2, self.gen_W3, output_shape=output_shape_l3, strides=[1,2,2,1])

@@ -28,13 +28,15 @@ def crop_resize(image_path, resize_shape=(64,64)):
 
     return resized_image/127.5 - 1
 
-def save_visualization(X, nh_nw, save_path='./vis/sample.jpg'):
+def save_visualization(X_origin, X, nh_nw, save_path='./vis/sample.jpg'):
     h,w = X.shape[1], X.shape[2]
-    img = np.zeros((h * nh_nw[0], w * nh_nw[1], 3))
+    img = np.zeros((h * nh_nw[0], w * 2 * nh_nw[1], 3))
 
     for n,x in enumerate(X):
+        x_origin=X_origin[n]
         j = n // nh_nw[1]
         i = n % nh_nw[1]
-        img[j*h:j*h+h, i*w:i*w+w, :] = x
+        img[j*h:j*h+h, (2*i)*w:(2*i)*w+w, :] = x_origin
+        img[j*h:j*h+h, (2*i+1)*w:(2*i+1)*w+w, :] = x
 
     scipy.misc.imsave(save_path, img)
